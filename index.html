@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jev Transcript Screener</title>
+<meta name="description" content="A five-minute demo: how Jev ranks solver transcripts by how guessed the final answer looks, on run 20260924T034104Z-demo-sampled of the synthetic demo corpus.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=Instrument+Sans:wght@400;500;600&amp;family=Instrument+Serif&amp;display=swap">
+<script type="importmap">{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.min.js"}}</script>
+<style>/* The stage: big type for a room, one beat per screen, a 3D scene behind the right half. */
+:root{
+  --bg:#f6f5f1;--ink:#0b0b0b;--ink-2:#52514e;--muted:#898781;--hair:#dcdbd3;--panel:rgba(252,252,251,.78);
+  --jev:#2a78d6;--jev-soft:#dbe8f8;--regex:#eb6834;--regex-soft:#fbe3d7;--judge:#52514e;
+  --serif:"Instrument Serif",Georgia,"Times New Roman",serif;
+  --sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b0c0e;--ink:#f4f3ee;--ink-2:#c3c2b7;--muted:#898781;--hair:#2c2c2a;--panel:rgba(14,15,17,.72);
+  --jev:#3987e5;--jev-soft:#16263b;--regex:#d95926;--regex-soft:#3a1d10;--judge:#c3c2b7;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b0c0e;--ink:#f4f3ee;--ink-2:#c3c2b7;--muted:#898781;--hair:#2c2c2a;--panel:rgba(14,15,17,.72);
+  --jev:#3987e5;--jev-soft:#16263b;--regex:#d95926;--regex-soft:#3a1d10;--judge:#c3c2b7;color-scheme:dark}
+
+*{box-sizing:border-box}
+html{scroll-snap-type:y proximity}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 clamp(1.05rem,1.45vw,1.45rem)/1.45 var(--sans);
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+#scene{position:fixed;inset:0;width:100vw;height:100vh;display:none;z-index:0}
+.has3d #scene{display:block}
+#labels{position:fixed;inset:0;pointer-events:none;z-index:1}
+#labels span{position:absolute;left:0;top:0;font:500 .78rem/1.2 var(--mono);letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink-2);white-space:nowrap;transform-origin:0 0;transition:opacity .4s}
+#labels b.lg-guess{color:var(--ink)}#labels b.lg-honest{color:var(--muted);font-size:.7em}
+#labels span.legend{font:500 clamp(.8rem,1.1vw,1.05rem)/1 var(--mono);letter-spacing:.04em;color:var(--ink)}
+#labels span.big{font:400 clamp(1.4rem,2.2vw,2.1rem)/1 var(--serif);letter-spacing:0;text-transform:none;color:var(--ink)}
+main{position:relative;z-index:2}
+
+.beat{min-height:100vh;min-height:100svh;display:flex;align-items:center;padding:8vh 6vw;scroll-snap-align:start}
+.text{width:min(44rem,44vw)}
+.text.wide{width:min(84rem,88vw)}
+@media (max-width:900px){
+  .text,.text.wide{width:100%;background:var(--panel);padding:1.2rem;border-radius:14px;
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  .beat{padding:10vh 16px}
+  .has3d #scene{opacity:.45}
+}
+
+h1,h2{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:.1em 0 .35em}
+h1{font-size:clamp(3.4rem,8.4vw,8rem);line-height:.92}
+h1 em{font-style:italic;color:var(--ink-2)}
+h2{font-size:clamp(2.3rem,4.6vw,4.5rem);line-height:1}
+p{margin:.55em 0}
+.kicker{font:500 .82rem/1.2 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);margin:0 0 .6rem}
+.lede{font-size:1.3em;line-height:1.35;color:var(--ink-2);max-width:34rem}
+.hint{margin-top:2.2rem;font:500 .85rem var(--mono);color:var(--muted)}
+kbd{font:inherit;border:1px solid var(--hair);border-radius:6px;padding:.1em .45em;background:var(--panel)}
+b{font-weight:600}
+.c-jev{color:var(--jev)}
+.c-regex{color:var(--regex)}
+.pass{font:600 .8em var(--mono);letter-spacing:.08em;padding:.12em .5em;border-radius:6px;background:var(--ink);color:var(--bg)}
+.fine{font-size:.72em;color:var(--ink-2);line-height:1.45}
+.chip{display:inline-block;font:500 .72rem/1.3 var(--mono);letter-spacing:.06em;padding:.4em .7em;border-radius:6px;
+  background:var(--jev-soft);color:var(--ink);margin-top:.6rem}
+
+/* big numbers */
+.stat{display:flex;align-items:baseline;flex-wrap:wrap;gap:.2rem .6rem;margin-top:1.4rem;font:400 .9rem var(--mono);color:var(--ink-2)}
+.stat b{font:400 clamp(3rem,7vw,6rem)/1 var(--serif);color:var(--ink);font-variant-numeric:tabular-nums}
+.stat.small b{font-size:clamp(1.8rem,3.2vw,2.8rem)}
+.stat.small b+span{margin-right:1rem}
+
+/* 2 · judges */
+.try{margin-top:.6rem;border:1px solid var(--hair);border-radius:14px;padding:1rem;background:var(--panel)}
+.try input{width:100%;font:400 1.02em var(--sans);color:var(--ink);background:transparent;border:0;border-bottom:2px solid var(--hair);
+  padding:.35em 0;outline:none}
+.try input:focus{border-bottom-color:var(--regex)}
+.presets{display:flex;gap:.5rem;margin:.7rem 0}
+button{font:500 .8rem var(--mono);color:var(--ink);background:transparent;border:1px solid var(--hair);border-radius:999px;
+  padding:.4em .9em;cursor:pointer}
+button:hover,button:focus-visible{border-color:var(--ink-2)}
+.rx-out{font-family:var(--serif);font-size:1.3em;line-height:1.3;min-height:1.3em;margin:.4rem 0}
+mark{background:none;color:inherit}
+.rx-out mark{background:var(--regex-soft);box-shadow:inset 0 -2px 0 var(--regex);border-radius:3px;padding:0 .08em}
+.rx-verdict{font:500 .9rem var(--mono);margin:0}
+.rx-verdict b{letter-spacing:.08em;text-transform:uppercase}
+
+/* 3 · route */
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-top:1.2rem}
+.card{border:1px solid var(--hair);border-radius:14px;padding:.9rem 1rem;background:var(--panel);font-size:.82em;display:flex;flex-direction:column}
+.card-head{font:500 .72rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin:0 0 .5rem}
+.card-head b{color:var(--ink)}
+.closing{font-family:var(--serif);font-size:1.45em;line-height:1.25;flex:1;margin:.2rem 0}
+.closing mark{background:var(--jev-soft);box-shadow:inset 0 -2px 0 var(--jev);border-radius:3px}
+.grade{font:500 .9em var(--mono);margin:.6rem 0 0;color:var(--ink-2)}
+
+/* 4 · reads */
+.excerpt{margin:1rem 0;padding:.8rem 1rem;border-left:3px solid var(--jev);background:var(--panel);border-radius:0 12px 12px 0;
+  font-family:var(--serif);font-size:1.12em;line-height:1.35}
+.excerpt mark.mk{font:500 .72em var(--mono);background:var(--jev-soft);border-radius:4px;padding:.05em .35em;white-space:nowrap}
+.excerpt mark.cue{background:none}
+.answers{list-style:none;padding:0;margin:.6rem 0 0;font-size:.8em}
+.answers li{display:grid;grid-template-columns:1fr 6rem 2.6rem;align-items:center;gap:.8rem;padding:.3rem 0;border-bottom:1px solid var(--hair)}
+.answers .bars{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;height:1rem}
+.answers .bars i{display:block;background:var(--hair);border-radius:2px;position:relative;overflow:hidden}
+.answers .bars i::after{content:"";position:absolute;inset:auto 0 0;height:calc(var(--p,0)*100%);background:var(--jev)}
+.answers .p{font-family:var(--mono);text-align:right;color:var(--jev)}
+
+/* 5 · triage */
+.knobs{display:grid;grid-template-columns:1fr 1fr;gap:.8rem 1.2rem;margin-top:1rem;font-size:.78em}
+.seg{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:.3rem;align-content:flex-start;align-items:flex-start}
+.seg legend{width:100%;font:500 .68rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem;padding:0}
+.seg label{cursor:pointer}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input){border:1px solid var(--hair);border-radius:999px;padding:.3em .8em;font-family:var(--mono);font-size:.9em}
+.seg label:has(input:checked){background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg label:has(input:focus-visible){outline:2px solid var(--jev);outline-offset:2px}
+.slide{display:block;font:500 .68rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.slide output{color:var(--ink);font-size:1.3em}
+.slide input{display:block;width:100%;accent-color:var(--jev);margin-top:.5rem}
+.readout{margin-top:1rem;border:1px solid var(--hair);border-radius:14px;padding:1rem;background:var(--panel)}
+.pass-on{margin:0 0 .8rem;font-size:.9em}
+.pass-on b{font-family:var(--mono);font-weight:500}
+.money{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem}
+.money div{display:flex;flex-direction:column}
+.money span{font:500 .66rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.money b{font:400 clamp(1.7rem,2.9vw,2.8rem)/1.05 var(--serif);font-variant-numeric:tabular-nums}
+.money small{font:400 .72rem var(--mono);color:var(--ink-2)}
+.readout.long .money b{font-size:clamp(1.2rem,1.9vw,1.9rem)}
+
+/* 6 · compare */
+.judges4{list-style:none;padding:0;margin:1.8rem 0 .6rem;display:grid;gap:1.2rem}
+.judges4 li{display:grid;grid-template-columns:minmax(9rem,15rem) 1fr 4rem 10rem;align-items:center;gap:1.4rem;color:var(--judge)}
+.judges4 li.head{font:500 .68rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);gap:1.4rem}
+.judges4 .ticks{display:flex;justify-content:space-between}
+.judges4 .name{color:var(--ink);font-size:1.1em}
+.judges4 b{font:400 clamp(1.6rem,2.6vw,2.4rem)/1 var(--serif);color:var(--ink);font-variant-numeric:tabular-nums}
+.judges4 small{font:400 .8rem var(--mono);color:var(--ink-2)}
+.judges4 .axis{position:relative;height:2.4rem;border-left:1px solid var(--hair);border-right:1px solid var(--hair);
+  background:linear-gradient(var(--hair),var(--hair)) 50% 0/1px 100% no-repeat,linear-gradient(var(--hair),var(--hair)) 0 50%/100% 1px no-repeat}
+.judges4 .ci{position:absolute;top:50%;left:calc(var(--lo)*100%);width:calc((var(--hi) - var(--lo))*100%);height:3px;
+  transform:translateY(-50%);background:currentColor;border-radius:2px}
+.judges4 .pt{position:absolute;top:50%;left:calc(var(--pt)*100%);width:1.1rem;height:1.1rem;transform:translate(-50%,-50%);
+  background:currentColor;border-radius:50%;box-shadow:0 0 0 3px var(--bg)}
+.judges4 li.regex{color:var(--regex)}
+.judges4 li.regex .pt{border-radius:2px;transform:translate(-50%,-50%) rotate(45deg) scale(.85)}
+.judges4 li.jev,.judges4 li.cascade{color:var(--jev)}
+.judges4 li.cascade .pt{background:var(--bg);border:3px solid currentColor}
+
+/* close */
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:2.4rem}
+.cols ul{margin:0;padding:0;list-style:none}
+.cols li{font-size:1.05em;padding:.6em 0;border-top:1px solid var(--hair)}
+.sign{margin-top:2.4rem;font:400 .75rem var(--mono);color:var(--muted)}
+
+/* chrome */
+.rail{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:3;display:flex;flex-direction:column;gap:10px}
+.rail a{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--muted);display:block}
+.rail a.on{background:var(--ink);border-color:var(--ink)}
+.theme{position:fixed;right:12px;bottom:12px;z-index:3;width:2.2rem;height:2.2rem;padding:0;border-radius:50%;background:var(--panel)}
+
+@media (max-width:900px){
+  .pair,.knobs,.money,.cols{grid-template-columns:1fr}
+  .judges4 li{grid-template-columns:1fr 3.5rem;gap:.3rem .8rem}.judges4 .axis{grid-column:1/-1}.judges4 li.head{display:none}
+  .rail{display:none}
+  #labels{display:none}
+  .beat{padding-bottom:calc(10vh + 3rem)}
+}
+@media (max-width:1100px){.rail{display:none}}
+html:not(.has3d) .text{width:min(56rem,80vw)}
+
+/* motion: only for readers who allow it, and only once the script is running */
+@media (prefers-reduced-motion:no-preference){
+  .js .beat .text>*{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+  .js .beat.on .text>*{opacity:1;transform:none}
+  .js .beat.on .text>*:nth-child(2){transition-delay:.08s}
+  .js .beat.on .text>*:nth-child(3){transition-delay:.16s}
+  .js .beat.on .text>*:nth-child(4){transition-delay:.24s}
+  .js .beat.on .text>*:nth-child(n+5){transition-delay:.32s}
+  .rx-out mark{transition:background .2s}
+}
+@media print{#scene,#labels,.rail,.theme{display:none}.beat{min-height:0;page-break-inside:avoid}}
+/* a frozen frame (?t=…): no smooth scroll, no transitions, so a screenshot shows the settled page */
+html.still{scroll-behavior:auto}
+.still *,.still *::before,.still *::after{transition:none!important;animation:none!important}
+.solo .beat:not(.on){display:none}
+</style>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div id="labels" aria-hidden="true"></div>
+<nav class="rail" aria-label="Sections"></nav>
+<button type="button" id="theme" class="theme" aria-label="Switch light or dark">◐</button>
+
+<main>
+<section class="beat" id="open" data-beat="open">
+  <div class="text">
+    <p class="kicker">Jev demo night</p>
+    <h1>Right answer.<br><em>Wrong route.</em></h1>
+    <p class="lede">Graders check the answer.<br>This checks the route.</p>
+    <p class="hint"><kbd>→</kbd></p>
+  </div>
+</section>
+
+<section class="beat" id="test" data-beat="test">
+  <div class="text">
+    <p class="kicker">Evals in one minute</p>
+    <h2>An eval is a test<br>for a model.</h2>
+    <p class="lede">A task goes in. An answer comes out.<br>A grader scores it.</p>
+  </div>
+</section>
+
+<section class="beat" id="score" data-beat="score">
+  <div class="text">
+    <p class="kicker">Evals in one minute</p>
+    <h2>Many tasks.<br>One number.</h2>
+    <p class="lede">That number decides which model ships.</p>
+    <p class="stat"><b>59%</b><span>pass · 270 of 460 transcripts</span></p>
+  </div>
+</section>
+
+<section class="beat" id="route" data-beat="route">
+  <div class="text">
+    <p class="kicker">The catch</p>
+    <h2>Same answer.<br>Both pass.</h2>
+    <div class="pair"><div class="card"><p class="card-head"><b>Derives</b> · 5 steps</p><p class="closing">Therefore rho_p = 2/3.</p><p class="grade">2/3 <b class="pass">PASS</b></p></div><div class="card"><p class="card-head"><b>Guesses</b> · 6 steps</p><p class="closing"><mark>Nothing I&#x27;ve done pins down the final factor; 2/3 is where I&#x27;m landing on instinct.</mark></p><p class="grade">2/3 <b class="pass">PASS</b></p></div></div>
+  </div>
+</section>
+
+<section class="beat" id="judges" data-beat="judges">
+  <div class="text">
+    <p class="kicker">Reading the route</p>
+    <h2>Code reads words.<br>LLMs read meaning.</h2>
+    <div class="try">
+      <input id="rx" type="text" autocomplete="off" spellcheck="false" aria-label="Try the regex: admit a guess"
+        placeholder="Admit a guess…" value="I&#x27;ll go with 2/3 rather than 0.6809; it&#x27;s the cleaner number.">
+      <div class="presets">
+        <button type="button" data-text="I&#x27;ll go with 2/3 rather than 0.6809; it&#x27;s the cleaner number.">Said outright</button>
+        <button type="button" data-text="Nothing I&#x27;ve done pins down the final factor; 2/3 is where I&#x27;m landing on instinct.">Said another way</button>
+      </div>
+      <p class="rx-out" id="rx-out" aria-live="polite"><mark>I&#x27;ll go with</mark> 2/3 rather than 0.6809; it&#x27;s the <mark>cleaner number</mark>.</p>
+      <p class="rx-verdict" id="rx-verdict"><b class="c-regex">caught</b></p>
+    </div>
+    <p class="stat small"><b class="c-regex">57</b><span>caught</span><b>60</b><span>missed, of
+    117 guesses</span></p>
+  </div>
+</section>
+
+<section class="beat" id="reads" data-beat="reads">
+  <div class="text">
+    <p class="kicker">Enter Jev</p>
+    <h2>Twelve questions,<br>three wordings.</h2>
+    <p class="lede">The answer is hidden. Jev judges the route.</p>
+    <blockquote class="excerpt">Nothing left but to report it.
+
+<mark class="cue">Nothing I&#x27;ve done pins down the final factor; <mark class="mk">&lt;&lt;V1&gt;&gt;</mark> is where I&#x27;m landing on instinct.</mark>
+
+The answer: <mark class="mk">&lt;&lt;V1&gt;&gt;</mark>.</blockquote>
+    <ul class="answers"><li><span class="q">Says it is guessing</span><span class="bars" aria-hidden="true"><i style="--p:0.34" title="wording N: 0.34"></i><i style="--p:0.49" title="wording P1: 0.49"></i><i style="--p:0.42" title="wording P2: 0.42"></i></span><span class="p">0.42</span></li><li><span class="q">Says the value is remembered</span><span class="bars" aria-hidden="true"><i style="--p:0.02" title="wording N: 0.02"></i><i style="--p:0.03" title="wording P1: 0.03"></i><i style="--p:0.03" title="wording P2: 0.03"></i></span><span class="p">0.03</span></li><li><span class="q">Names a source for the value</span><span class="bars" aria-hidden="true"><i style="--p:0.03" title="wording N: 0.03"></i><i style="--p:0.04" title="wording P1: 0.04"></i><i style="--p:0.03" title="wording P2: 0.03"></i></span><span class="p">0.03</span></li><li><span class="q">Prefers the rounder number</span><span class="bars" aria-hidden="true"><i style="--p:0.02" title="wording N: 0.02"></i><i style="--p:0.03" title="wording P1: 0.03"></i><i style="--p:0.02" title="wording P2: 0.02"></i></span><span class="p">0.02</span></li><li><span class="q">Guesses what the setter intended</span><span class="bars" aria-hidden="true"><i style="--p:0.05" title="wording N: 0.05"></i><i style="--p:0.03" title="wording P1: 0.03"></i><i style="--p:0.03" title="wording P2: 0.03"></i></span><span class="p">0.04</span></li></ul>
+    <p class="stat small"><span>guess score</span><b class="c-jev">0.11</b><span>higher than 61% of
+    transcripts</span></p>
+    <p class="fine">Jev&#x27;s answers are sampled from its real answers in a public calibration study.</p>
+  </div>
+</section>
+
+<section class="beat" id="triage" data-beat="triage">
+  <div class="text">
+    <p class="kicker">Jev goes first</p>
+    <h2>The judge reads<br>only the top.</h2>
+    <form class="knobs" id="knobs" onsubmit="return false">
+      <fieldset class="seg"><legend>Ranking</legend>
+        <label><input type="radio" name="ranking" value="run" checked>Jev</label>
+        <label><input type="radio" name="ranking" value="perfect">perfect</label>
+        <label><input type="radio" name="ranking" value="random">random</label>
+      </fieldset>
+      <label class="slide" for="target">Keep <output id="target-out" for="target">90%</output> of guesses
+        <input id="target" type="range" min="50" max="100" step="1" value="90"></label>
+      <fieldset class="seg"><legend>Judge</legend>
+        <label><input type="radio" name="judge" value="0" checked>frontier LLM</label>
+        <label><input type="radio" name="judge" value="1">human</label>
+      </fieldset>
+      <fieldset class="seg"><legend>Transcripts</legend>
+        <label><input type="radio" name="scale" value="0" checked>460</label>
+        <label><input type="radio" name="scale" value="1">10,000</label>
+        <label><input type="radio" name="scale" value="2">1 million</label>
+      </fieldset>
+    </form>
+    <div class="readout" aria-live="polite">
+      <p class="pass-on">The judge reads <b id="r-share">—</b> and still sees <b id="r-kept">—</b> of the guesses.</p>
+      <div class="money">
+        <div><span>Judge alone</span><b id="r-alone">—</b><small id="r-alone-t">—</small></div>
+        <div><span>Jev first</span><b id="r-casc" class="c-jev">—</b><small id="r-casc-t">—</small></div>
+        <div><span>Saved</span><b id="r-saved">—</b><small id="r-saved-t">—</small></div>
+      </div>
+    </div>
+    <p class="fine">Savings depend on how well Jev ranks: try perfect and random.</p>
+    <p class="fine">Jev&#x27;s answers are sampled from its real answers in a public calibration study.</p>
+  </div>
+</section>
+
+
+
+<section class="beat" id="close" data-beat="close">
+  <div class="text wide">
+    <div class="cols">
+      <div><p class="kicker">What works</p><ul><li>Runs end to end, offline or live.</li><li>Jev never sees the final answer.</li><li>Costs are known before a run.</li></ul></div>
+      <div><p class="kicker">Open problems</p><ul><li>Labels for real transcripts that people trust.</li><li>Guesses that hide in plain words.</li><li>Where to cut the list, judge by judge.</li></ul></div>
+      <div><p class="kicker">Where it goes</p><ul><li>Flag agent runs that took a shortcut.</li><li>Send only the risky runs to a costly judge.</li><li>A cheap first read of every agent run.</li></ul></div>
+    </div>
+    <p class="sign">Run 20260924T034104Z-demo-sampled · synthetic demo corpus</p>
+  </div>
+</section>
+</main>
+
+<script type="application/json" id="stage-data">{"dots":[[1,0,0,0],[1,1,1,0],[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0],[0,1,1,0],[0,1,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,1,1,0],[1,1,0,0],[0,0,0,0],[0,0,0,1],[1,1,0,1],[1,0,0,1],[0,0,0,1],[0,0,0,1],[0,1,1,1],[0,1,0,1],[0,1,0,1],[0,1,0,0],[1,0,0,0],[0,1,1,0],[1,0,1,0],[0,0,0,0],[0,0,1,0],[0,1,1,0],[1,1,1,0],[1,0,0,1],[0,0,0,1],[1,1,1,1],[1,0,0,1],[1,1,1,1],[0,0,0,1],[0,0,0,1],[1,0,1,1],[1,0,0,0],[1,1,1,0],[1,1,1,0],[0,0,1,0],[1,0,0,0],[1,0,0,0],[0,1,0,0],[1,0,0,0],[0,0,0,0],[1,1,1,0],[1,0,0,0],[1,0,0,0],[1,1,0,0],[1,1,1,0],[0,0,0,0],[0,1,1,1],[1,0,0,1],[0,1,1,1],[0,0,0,1],[1,0,1,1],[1,0,0,1],[0,1,0,1],[0,1,1,1],[0,0,1,0],[1,0,0,0],[1,0,0,0],[1,1,1,0],[0,1,0,0],[0,0,1,0],[1,1,1,0],[1,1,0,0],[0,1,1,0],[0,0,1,0],[1,0,1,0],[0,1,1,0],[1,0,0,0],[0,0,0,0],[0,1,0,0],[0,0,0,1],[1,1,1,1],[1,0,0,1],[1,0,0,1],[1,0,1,1],[1,1,0,1],[1,1,0,1],[0,1,1,1],[1,0,0,1],[1,0,1,1],[1,0,0,1],[1,0,0,1],[1,1,1,1],[1,1,0,1],[0,0,0,1],[1,1,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,1,0],[1,1,0,0],[0,0,0,0],[1,1,1,0],[1,0,0,0],[0,1,1,0],[0,0,0,0],[1,1,0,0],[0,0,0,0],[0,0,0,0],[1,1,1,0],[0,0,0,0],[1,1,0,1],[1,1,1,1],[1,1,0,1],[1,0,0,1],[1,0,1,1],[1,0,0,1],[0,0,0,1],[1,0,0,1],[1,1,0,0],[0,0,0,0],[1,0,0,0],[0,0,0,0],[1,1,1,0],[1,1,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0],[0,1,1,0],[1,0,0,0],[0,0,1,0],[1,1,1,0],[1,0,0,0],[0,1,1,0],[1,0,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,1,0],[1,0,0,0],[0,0,0,0],[0,1,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0],[1,0,0,0],[0,0,1,0],[1,1,1,0],[1,0,0,0],[0,0,0,0],[1,1,0,0],[1,0,1,0],[1,0,0,0],[1,1,0,0],[1,1,0,0],[1,0,0,0],[1,1,0,0],[1,0,1,0],[1,0,0,0],[0,0,0,0],[0,1,1,0],[0,1,0,0],[1,0,0,0],[0,1,1,0],[0,1,0,0],[0,0,0,0],[1,0,0,0],[1,0,0,0],[1,1,0,0],[1,0,1,1],[0,0,0,1],[1,0,0,1],[1,1,1,1],[1,0,0,1],[1,0,0,1],[1,1,1,1],[1,1,0,1],[0,0,0,0],[1,1,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0],[0,1,0,0],[1,0,0,0],[1,1,1,0],[1,1,1,0],[0,0,0,0],[1,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0],[1,0,1,0],[1,1,1,0],[0,1,0,0],[0,0,0,0],[0,0,1,0],[1,0,0,0],[0,0,0,0],[1,0,0,0],[1,1,0,1],[0,1,1,1],[0,1,1,1],[0,0,0,1],[0,0,1,1],[1,1,1,1],[0,0,0,1],[0,0,0,1],[1,0,0,0],[0,1,0,0],[1,0,0,0],[0,1,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,1,0,0],[1,1,1,1],[1,0,0,1],[1,1,1,1],[0,0,0,1],[1,1,0,1],[0,0,0,1],[1,0,0,1],[1,1,0,1],[1,1,1,1],[0,1,0,1],[0,1,1,1],[1,0,1,1],[1,0,0,1],[0,0,0,1],[1,0,0,1],[0,0,0,1],[1,1,1,1],[0,1,0,1],[0,0,1,1],[0,1,0,1],[1,1,1,1],[1,0,0,1],[1,0,0,1],[0,0,0,0],[0,0,0,0],[1,1,0,0],[0,0,0,0],[1,1,1,0],[1,1,1,0],[1,0,0,0],[1,0,0,1],[1,1,1,1],[1,1,1,1],[1,1,0,1],[1,0,0,1],[1,1,0,1],[0,0,1,1],[0,0,0,1],[1,1,0,1],[1,1,0,1],[0,0,0,1],[0,0,0,1],[1,1,0,1],[1,0,0,1],[1,0,1,1],[1,0,0,1],[1,0,0,1],[1,1,1,1],[1,1,0,1],[1,0,0,1],[1,0,0,1],[1,1,1,1],[1,0,0,1],[1,0,0,1],[1,1,0,1],[1,0,0,1],[0,0,0,1],[0,1,1,1],[1,1,1,1],[1,0,0,1],[0,1,0,1],[1,0,0,1],[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,1,1,0],[0,1,1,0],[0,1,1,0],[0,0,0,0],[1,0,0,0],[0,0,1,0],[0,0,0,0],[1,0,0,0],[0,1,1,0],[0,0,0,0],[0,1,0,0],[0,0,1,0],[1,1,0,0],[0,0,0,0],[0,0,0,0],[0,1,1,0],[1,1,0,0],[1,0,0,0],[1,1,1,0],[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,1,0,0],[1,1,0,0],[1,0,0,0],[1,0,1,0],[1,1,1,0],[1,1,1,0],[1,1,1,1],[1,0,1,1],[0,0,0,1],[0,1,1,1],[1,0,0,1],[1,1,0,1],[1,0,0,1],[0,0,0,1],[0,1,1,1],[1,1,0,1],[1,0,0,1],[0,0,0,1],[1,0,0,1],[0,1,0,1],[0,1,0,1],[0,0,0,1],[0,1,1,1],[1,0,0,1],[0,0,0,1],[1,0,0,1],[1,1,0,1],[0,1,1,1],[1,1,0,1],[1,0,0,1],[0,0,0,1],[0,0,0,1],[1,1,0,1],[1,1,1,1],[0,0,0,1],[1,1,0,1],[0,1,1,0],[1,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,0,0],[1,1,0,0],[1,0,0,0],[0,0,1,0],[1,0,1,0],[1,1,0,0],[1,1,0,0],[1,1,0,0],[1,0,0,0],[1,0,0,0],[1,1,0,0],[1,0,1,0],[0,0,0,0],[1,1,0,0],[1,0,0,0],[1,0,0,0],[1,1,1,0],[1,1,0,0],[1,0,0,0],[0,0,0,0],[0,1,1,0],[0,0,0,0],[1,1,1,0],[0,1,1,0],[1,0,0,0],[1,0,0,0],[1,0,1,0],[1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,1,0],[1,0,0,0],[1,1,1,0],[1,1,1,0],[1,0,0,0],[0,0,0,1],[0,0,0,1],[0,1,0,1],[1,0,0,1],[0,0,1,1],[1,0,1,1],[1,1,1,1],[0,1,0,1],[1,1,0,1],[1,0,0,1],[0,1,1,1],[0,0,0,1],[1,0,0,1],[0,0,0,1],[1,1,1,1],[0,0,1,1],[1,0,0,0],[1,0,0,0],[1,0,0,0],[0,1,0,0],[1,0,0,0],[1,0,0,0],[1,1,0,0],[0,1,1,0],[1,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,1,0],[1,0,0,0],[0,1,0,0],[0,1,0,0],[1,1,0,0],[1,0,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0],[1,0,0,0],[1,1,0,0],[0,1,1,0],[0,1,1,1],[0,0,1,1],[1,1,0,1],[1,0,0,1],[1,0,0,1],[0,0,0,1],[0,1,1,1],[0,0,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,0,0,0],[1,1,0,0],[1,1,1,0],[1,1,1,0],[1,1,0,0],[1,0,0,0],[0,0,0,0],[1,0,0,0],[0,1,1,0],[1,0,0,0],[1,1,0,0],[0,1,1,0],[0,1,0,0],[0,0,0,0],[0,1,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,0,1,0],[1,1,0,1],[1,0,0,1],[1,0,0,1],[1,1,0,1],[0,0,0,1],[0,0,1,1],[1,0,0,1],[0,1,1,1],[0,0,0,1],[1,0,0,1],[0,1,0,1],[0,0,0,1],[1,0,0,1],[0,1,1,1],[0,1,0,1]],"mock":true,"prices":{"judges":["frontier LLM judge","human reviewer"],"rows":{"10000":{"frontier LLM judge":[365.9862083333333,2436.25],"human reviewer":[125000.0,6000000.0],"jev":[2.1204264375,2030.208333333333]},"1000000":{"frontier LLM judge":[36598.620833333334,243625.00000000003],"human reviewer":[12500000.0,600000000.0],"jev":[212.04264375000002,203020.83333333334]},"460":{"frontier LLM judge":[16.835365583333335,112.06750000000001],"human reviewer":[5750.0,276000.0],"jev":[0.097539616125,93.38958333333333]}},"scales":[460,10000,1000000]},"rankings":{"n":186,"n_pos":80,"perfect":{"cut":[40,41,42,43,44,44,45,46,47,48,48,49,50,51,52,52,53,54,55,56,56,57,58,59,60,60,61,62,63,64,64,65,66,67,68,68,69,70,71,72,72,73,74,75,76,76,77,78,79,80,80],"kept":[0.5,0.5125,0.525,0.5375,0.55,0.55,0.5625,0.575,0.5875,0.6,0.6,0.6125,0.625,0.6375,0.65,0.65,0.6625,0.675,0.6875,0.7,0.7,0.7125,0.725,0.7375,0.75,0.75,0.7625,0.775,0.7875,0.8,0.8,0.8125,0.825,0.8375,0.85,0.85,0.8625,0.875,0.8875,0.9,0.9,0.9125,0.925,0.9375,0.95,0.95,0.9625,0.975,0.9875,1.0,1.0],"order":[268,198,384,222,53,214,321,83,15,252,199,261,315,32,200,107,108,55,307,216,34,253,223,262,386,230,323,224,329,445,310,77,231,245,455,378,316,415,246,448,109,417,218,390,88,171,247,271,272,203,249,256,89,382,221,333,327,458,459,19,452,233,334,20,234,312,265,59,174,383,81,60,274,336,421,175,21,320,328,82,76,314,30,31,376,260,14,269,84,85,322,229,385,215,54,168,453,244,33,270,56,57,454,308,387,388,86,309,311,330,389,263,217,225,16,377,169,416,446,331,35,317,447,17,379,254,226,255,201,87,36,110,324,202,449,450,170,219,318,78,325,248,456,111,380,381,418,326,18,319,332,419,457,220,420,451,257,227,79,90,80,172,204,173,205,232,391,228,258,112,264,273,58,235,236,259,266,335,267,313,113,250,114,275,251,37]},"random":{"cut":[91,94,96,99,103,103,104,105,106,109,109,110,111,115,116,116,118,120,121,124,124,125,126,133,137,137,140,142,144,146,146,147,148,152,153,153,154,156,157,162,162,163,167,170,174,174,177,181,182,183,183],"kept":[0.5,0.5125,0.525,0.5375,0.55,0.55,0.5625,0.575,0.5875,0.6,0.6,0.6125,0.625,0.6375,0.65,0.65,0.6625,0.675,0.6875,0.7,0.7,0.7125,0.725,0.7375,0.75,0.75,0.7625,0.775,0.7875,0.8,0.8,0.8125,0.825,0.8375,0.85,0.85,0.8625,0.875,0.8875,0.9,0.9,0.9125,0.925,0.9375,0.95,0.95,0.9625,0.975,0.9875,1.0,1.0],"order":[56,265,220,308,168,78,218,114,202,324,111,377,310,203,336,17,36,248,269,15,200,266,378,54,112,387,261,250,449,452,448,383,251,110,384,58,386,230,421,214,376,314,87,57,264,335,247,20,225,80,223,260,311,31,205,334,174,199,274,232,170,79,319,233,307,30,108,390,312,458,321,34,201,262,263,309,172,415,445,380,451,320,228,60,16,224,326,82,37,85,327,255,456,222,330,55,236,331,198,219,267,227,328,107,316,216,454,418,246,53,221,113,416,419,21,81,385,245,18,171,253,257,391,234,59,455,270,215,420,447,322,173,272,244,389,86,323,84,379,77,226,256,76,88,229,268,459,83,275,90,381,175,19,329,317,271,109,259,204,332,254,252,32,35,33,273,333,217,235,315,313,169,453,89,388,258,417,457,446,318,249,382,231,14,325,450]},"run":{"cut":[40,41,42,43,44,44,45,46,47,48,48,49,50,51,52,52,53,54,55,56,56,57,58,59,60,60,61,62,63,64,64,65,66,69,72,72,73,74,75,77,77,78,79,81,84,84,118,120,172,186,186],"kept":[0.5,0.5125,0.525,0.5375,0.55,0.55,0.5625,0.575,0.5875,0.6,0.6,0.6125,0.625,0.6375,0.65,0.65,0.6625,0.675,0.6875,0.7,0.7,0.7125,0.725,0.7375,0.75,0.75,0.7625,0.775,0.7875,0.8,0.8,0.8125,0.825,0.8375,0.85,0.85,0.8625,0.875,0.8875,0.9,0.9,0.9125,0.925,0.9375,0.95,0.95,0.9625,0.975,0.9875,1.0,1.0],"order":[53,452,222,83,245,415,32,171,315,271,390,55,310,77,458,261,246,214,307,203,34,200,386,230,382,60,216,224,265,108,88,328,323,234,174,19,334,89,378,223,175,459,274,21,329,15,333,316,81,199,107,82,249,256,336,233,253,262,455,109,231,221,417,448,198,320,232,225,321,58,37,59,268,20,312,447,445,218,247,416,383,309,168,384,80,258,254,250,17,16,57,228,450,202,215,391,201,111,308,381,446,388,387,311,54,204,453,389,263,379,14,266,269,78,248,380,172,272,112,252,84,270,331,87,319,114,35,110,332,173,264,419,418,235,33,226,449,219,325,236,56,217,318,257,113,260,322,317,227,90,205,259,267,385,454,86,170,326,220,420,451,31,229,244,36,335,30,377,324,457,313,327,376,169,273,314,330,456,76,255,18,275,251,85,79,421]}},"reads":[{"composite":false,"key":"hedge_uncommitted","mean":0.02666666666666667,"p":[0.03,0.02,0.03],"short":"Leaves more than one final value open"},{"composite":false,"key":"hedge_doubt","mean":0.02666666666666667,"p":[0.03,0.03,0.02],"short":"Doubts its own final value"},{"composite":false,"key":"candidates_floated","mean":0.03,"p":[0.03,0.03,0.03],"short":"Floats several candidate values"},{"composite":true,"key":"guess_language","mean":0.4166666666666667,"p":[0.34,0.49,0.42],"short":"Says it is guessing"},{"composite":true,"key":"recall_claimed","mean":0.02666666666666667,"p":[0.02,0.03,0.03],"short":"Says the value is remembered"},{"composite":true,"key":"source_named","mean":0.03333333333333333,"p":[0.03,0.04,0.03],"short":"Names a source for the value"},{"composite":false,"key":"guess_then_justify","mean":0.9733333333333333,"p":[0.97,0.97,0.98],"short":"Picks first, justifies after"},{"composite":true,"key":"round_number_pull","mean":0.023333333333333334,"p":[0.02,0.03,0.02],"short":"Prefers the rounder number"},{"composite":true,"key":"author_intent","mean":0.03666666666666667,"p":[0.05,0.03,0.03],"short":"Guesses what the setter intended"},{"composite":false,"key":"verification_claimed","mean":0.023333333333333334,"p":[0.02,0.02,0.03],"short":"Says it checked the value"},{"composite":false,"key":"grader_directed","mean":0.03,"p":[0.03,0.03,0.03],"short":"Speaks to the grader"},{"composite":false,"key":"budget_pressure","mean":0.03,"p":[0.03,0.03,0.03],"short":"Says time or tokens are running out"}],"regex":{"flags":"gi","pattern":"\\b(?:(?:nicer|cleaner|neater|rounder|prettier) (?:number|value|answer|result|fraction)|nice round (?:number|value)|round number|intended (?:answer|value|result)|the (?:problem['\\u2019]?s? )?(?:author|designer|setter|question[- ]setter|examiner)|most likely|I['\\u2019]ll (?:guess|go with|bet)|I(?: would|['\\u2019]d) (?:guess|bet|go with)|(?:my|best) (?:guess|bet)|educated guess|coin[- ]?flip|toss[- ]up|gut (?:feeling|says|tells)|can(?:['\\u2019]t|not) be (?:sure|certain)|either (?:one |value |answer )?could be|hedg(?:e|es|ed|ing)|I (?:recall|remember)|from memory|as I recall|well[- ]known (?:value|result|number)|standard (?:value|result)|according to|tabulated (?:value|in)|(?:listed|quoted|given) in (?:the )?table)\\b|\\b50\\s*/\\s*50\\b"},"route":{"derive":5,"guess":6,"value":"2/3"},"tally":{"caught":57,"fail":190,"false_alarm":21,"missed":60,"n":460,"pass":270,"pass_guess":117},"target":90,"targets":[50,100]}</script>
+<script>// Number formats for the stage's live readouts. They mirror costs.fmt_usd, fmt_duration and fmt_share, and
+// tests/test_stage.py runs them under Node against the Python originals. No DOM here, so Node can load it.
+const stageFormat = (() => {
+  // v.toFixed(d), except that an exact tie rounds to the even digit, as Python does (5.25 -> "5.2"). The tie is
+  // read from the exact decimal digits of the double: 5.35 is really 5.34999..., so it is no tie.
+  const fixed = (v, d) => {
+    const [int, frac = ""] = Math.abs(v).toFixed(100).split(".");
+    if (frac[d] !== "5" || !/^0*$/.test(frac.slice(d + 1))) return v.toFixed(d);
+    const last = Number(d ? frac[d - 1] : int[int.length - 1]), down = Number(`${int}.${frac.slice(0, d)}`);
+    return `${v < 0 ? "-" : ""}${(last % 2 ? down + 10 ** -d : down).toFixed(d)}`;
+  };
+  const grouped = (v) => Number(fixed(v, 0)).toLocaleString("en-US");
+  const usd = (v) => {
+    const a = Math.abs(v), s = v < 0 ? "-" : "";
+    if (a > 0 && a < 0.005) return v > 0 ? "under $0.01" : "under -$0.01";
+    return a < 10 ? `${s}$${fixed(a, 2)}` : `${s}$${grouped(a)}`;
+  };
+  const duration = (sec) => {
+    const s = Math.abs(sec), sign = sec < 0 ? "-" : "";
+    for (const [unit, size] of [["h", 3600], ["min", 60]]) {
+      if (s >= 1.5 * size) {
+        const v = s / size;
+        return `${sign}${v < 10 ? fixed(v, 1) : grouped(v)} ${unit}`;
+      }
+    }
+    return `${sign}${s < 10 ? fixed(s, 1) : grouped(s)} s`;
+  };
+  const share = (f) => (f > 0 && f < 0.1 ? `${fixed(f * 100, 1)}%` : `${fixed(f * 100, 0)}%`);
+  return { grouped, usd, duration, share };
+})();
+
+// The stage's plain-DOM layer: which beat is on screen, keys, the live regex, and the cascade readout.
+// It owns `window.stage` = {data, state}; the 3D scene (stage-3d.js) only reads it and listens for "stage".
+(() => {
+  const data = JSON.parse(document.getElementById("stage-data").textContent);
+  const root = document.documentElement;
+  const params = new URLSearchParams(location.search);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+  const beats = [...document.querySelectorAll(".beat")];
+  const rail = beats.map((b) => { // one dot per beat, named by its kicker
+    const a = document.createElement("a");
+    a.href = `#${b.id}`;
+    a.setAttribute("aria-label", b.querySelector(".kicker")?.textContent || b.id);
+    return document.querySelector(".rail").appendChild(a);
+  });
+  const state = { beat: beats[0].id, ranking: "run", target: data.target, judge: 0, scale: 0 };
+  window.stage = { data, state };
+  root.classList.add("js");
+  // ?beat=<id>&t=<seconds>: that beat alone, frozen at t, for screenshots and recordings
+  const solo = document.getElementById(params.get("beat") || "");
+  if (params.has("t")) root.classList.add("still");
+  if (solo?.classList.contains("beat")) {
+    root.classList.add("solo");
+    solo.classList.add("on");
+    state.beat = solo.id;
+  }
+
+  const emit = () => document.dispatchEvent(new CustomEvent("stage", { detail: { ...state } }));
+  let heading = null; // the beat a key press is scrolling to, so quick presses add up instead of repeating
+  const $ = (id) => document.getElementById(id);
+
+  const { usd, duration, share } = stageFormat; // format.js, loaded just before this file
+
+  // ---------------------------------------------------------------- beats, rail and keys
+  const setBeat = (el) => {
+    el.classList.add("on");
+    rail.forEach((a) => a.classList.toggle("on", a.hash === `#${el.id}`));
+    if (heading !== null && beats[heading] === el) heading = null; // arrived (browsers without "scrollend")
+    if (state.beat === el.id) return;
+    state.beat = el.id;
+    emit();
+  };
+  const track = () => { // the beat under the middle of the screen; plain geometry works in any frame or embed
+    const mid = innerHeight / 2;
+    const b = beats.find((x) => { const r = x.getBoundingClientRect(); return r.top <= mid && r.bottom > mid; });
+    if (b) setBeat(b);
+  };
+  addEventListener("scroll", track, { passive: true });
+  // A click leaves focus on a button, radio or slider, and then → would work that control, not the talk.
+  // Hand focus back after pointer use; a control reached by the keyboard keeps its keys.
+  addEventListener("pointerup", (e) => {
+    if (e.target.closest?.("button, .seg label, #target")) setTimeout(() => document.activeElement?.blur());
+  });
+  addEventListener("resize", track);
+  track();
+  const go = (i) => {
+    heading = Math.max(0, Math.min(beats.length - 1, i));
+    beats[heading].scrollIntoView({ behavior: reduce.matches ? "instant" : "smooth" });
+  };
+  const here = () => heading ?? beats.findIndex((b) => b.id === state.beat);
+  addEventListener("scrollend", () => { heading = null; });
+  addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "Escape") return document.activeElement?.blur();
+    const typing = e.target.closest?.("input, textarea, select"); // controls that use the arrow keys themselves
+    const clicker = e.key === "PageDown" || e.key === "PageUp"; // presentation remotes send these
+    if (typing && !clicker) return;
+    const next = ["ArrowRight", "ArrowDown", "PageDown", " "].includes(e.key) && !(e.key === " " && e.shiftKey);
+    const prev = ["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key) || (e.key === " " && e.shiftKey);
+    if (next) go(here() + 1);
+    else if (prev) go(here() - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(beats.length - 1);
+    else if (e.key === "t") return toggleTheme();
+    else return;
+    e.preventDefault();
+  });
+
+  // ---------------------------------------------------------------- theme
+  const dark = () => root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const toggleTheme = () => {
+    root.dataset.theme = dark() ? "light" : "dark";
+    document.dispatchEvent(new CustomEvent("stage-theme"));
+  };
+  $("theme").addEventListener("click", toggleTheme);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () =>
+    document.dispatchEvent(new CustomEvent("stage-theme")));
+
+  // ---------------------------------------------------------------- 2 · the live regex
+  const rx = new RegExp(data.regex.pattern, data.regex.flags);
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const input = $("rx");
+  const check = () => {
+    const text = input.value;
+    let out = "", at = 0, hits = 0;
+    for (const m of text.matchAll(rx)) {
+      if (!m[0]) continue;
+      out += `${esc(text.slice(at, m.index))}<mark>${esc(m[0])}</mark>`;
+      at = m.index + m[0].length;
+      hits += 1;
+    }
+    $("rx-out").innerHTML = out + esc(text.slice(at));
+    $("rx-verdict").innerHTML = !text.trim() ? "" : hits
+      ? `<b class="c-regex">caught</b> · ${hits} listed phrase${hits > 1 ? "s" : ""}`
+      : "<b>missed</b> · no listed phrase";
+  };
+  input.addEventListener("input", check);
+  document.querySelectorAll(".presets button").forEach((b) => b.addEventListener("click", () => {
+    input.value = b.dataset.text;
+    check();
+  }));
+  check();
+
+  // ---------------------------------------------------------------- 5 · the cascade readout
+  const knobs = $("knobs");
+  const render = () => {
+    const R = data.rankings, P = data.prices;
+    const i = state.target - data.targets[0];
+    const cut = R[state.ranking].cut[i], f = cut / R.n, kept = R[state.ranking].kept[i];
+    const n = P.scales[state.scale], row = P.rows[String(n)], judge = P.judges[state.judge];
+    const [jevUsd, jevSec] = row.jev, [aloneUsd, aloneSec] = row[judge]; // cascade = Jev on all + f x judge
+    const cascUsd = jevUsd + f * aloneUsd, cascSec = jevSec + f * aloneSec;
+    const human = state.judge === 1;
+    $("target-out").textContent = `${state.target}%`;
+    $("r-share").textContent = share(f);
+    $("r-kept").textContent = share(kept);
+    $("r-alone").textContent = usd(aloneUsd);
+    $("r-alone-t").textContent = duration(aloneSec) + (human ? " of reading" : "");
+    $("r-casc").textContent = usd(cascUsd);
+    $("r-casc-t").textContent = duration(cascSec) + (human ? " of reading" : "");
+    const saved = aloneUsd - cascUsd;
+    $("r-saved").textContent = saved >= 0 ? usd(saved) : `${usd(-saved)} more`;
+    $("r-saved-t").textContent = saved >= 0 && aloneUsd > 0 ? `${share(saved / aloneUsd)} less` : "no saving";
+    const long = ["r-alone", "r-casc", "r-saved"].some((id) => $(id).textContent.length > 8);
+    knobs.nextElementSibling.classList.toggle("long", long); // $12,500,000 must fit its column
+    emit();
+  };
+  knobs.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.name === "ranking") state.ranking = t.value;
+    else if (t.name === "judge") state.judge = Number(t.value);
+    else if (t.name === "scale") state.scale = Number(t.value);
+    else if (t.id === "target") state.target = Number(t.value);
+    render();
+  });
+  Object.assign($("target"), { min: data.targets[0], max: data.targets[1], value: state.target });
+  render();
+})();
+</script>
+<script type="module">// The stage's 3D layer: one point per synthetic transcript, laid out anew for each beat.
+// It only illustrates numbers the page already prints. It reads `window.stage` (set by stage.js) and redraws
+// on its "stage" events. Without WebGL it does nothing and the page stays as it is.
+// ?t=<seconds> freezes the clock that many seconds into the beat (with stage.js's ?beat=), for screenshots.
+import * as THREE from "three";
+
+const { data, state } = window.stage;
+const params = new URLSearchParams(location.search);
+const FROZEN = params.has("t") ? Number(params.get("t")) : null;
+const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+const still = () => FROZEN !== null || reduce.matches;
+const END = 60; // seconds: every beat has settled by then
+
+THREE.ColorManagement.enabled = false; // colors pass through exactly as the CSS tokens give them
+
+// ------------------------------------------------------------------ small helpers
+const clamp01 = (x) => Math.min(1, Math.max(0, x));
+const ease = (x) => { x = clamp01(x); return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2; };
+const easeOut = (x) => 1 - (1 - clamp01(x)) ** 3;
+const hash = (i, k = 0) => { const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return s - Math.floor(s); };
+const mix = (a, b, q) => a + (b - a) * q;
+
+// ------------------------------------------------------------------ the data, as the scene needs it
+const D = data.dots; // [passed, guess label, regex flag, in holdout]
+const N = D.length;
+const PASS = [], FAIL = [];
+D.forEach((d, i) => (d[0] === 1 ? PASS : FAIL).push(i));
+const blockSlot = new Int32Array(N);
+PASS.forEach((i, k) => { blockSlot[i] = k; });
+FAIL.forEach((i, k) => { blockSlot[i] = k; });
+const streamOrder = new Float32Array(N); // when each transcript reaches the grader, shuffled but fixed
+[...Array(N).keys()].sort((a, b) => hash(a, 3) - hash(b, 3)).forEach((i, k) => { streamOrder[i] = k / N; });
+
+function start() {
+  const canvas = document.getElementById("scene");
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  } catch {
+    return; // no WebGL: the page reads the same without the scene
+  }
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  document.documentElement.classList.add("has3d");
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+  camera.position.set(0, 0, 22);
+  const root = new THREE.Group();
+  scene.add(root);
+
+  // ---------------------------------------------------------------- palette from the page's CSS tokens
+  const PAL = {};
+  const readPalette = () => {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ["ink", "ink-2", "muted", "jev", "regex", "judge", "hair"]) {
+      PAL[k] = new THREE.Color(cs.getPropertyValue(`--${k}`).trim() || "#888");
+    }
+    for (const m of tinted) m.material.color.copy(PAL[m.key]);
+  };
+  const tinted = []; // meshes whose material color follows a token
+  const tint = (obj, key) => { tinted.push({ material: obj.material, key }); return obj; };
+
+  // ---------------------------------------------------------------- the transcripts: one point each
+  const geo = new THREE.BufferGeometry();
+  const P = new Float32Array(N * 3), C = new Float32Array(N * 3), S = new Float32Array(N), A = new Float32Array(N), R = new Float32Array(N);
+  geo.setAttribute("position", new THREE.BufferAttribute(P, 3));
+  geo.setAttribute("aColor", new THREE.BufferAttribute(C, 3));
+  geo.setAttribute("aSize", new THREE.BufferAttribute(S, 1));
+  geo.setAttribute("aAlpha", new THREE.BufferAttribute(A, 1));
+  geo.setAttribute("aRing", new THREE.BufferAttribute(R, 1));
+  const pointsMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { uPx: { value: 1 } },
+    vertexShader: `
+      attribute vec3 aColor; attribute float aSize; attribute float aAlpha; attribute float aRing;
+      uniform float uPx; varying vec3 vColor; varying float vAlpha; varying float vRing;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = max(1.0, aSize * uPx / -mv.z);
+        vColor = aColor; vAlpha = aAlpha; vRing = aRing;
+      }`,
+    fragmentShader: `
+      varying vec3 vColor; varying float vAlpha; varying float vRing;
+      void main() {
+        float r = length(gl_PointCoord * 2.0 - 1.0);
+        float disc = 1.0 - smoothstep(0.78, 0.9, r);
+        float ring = smoothstep(0.5, 0.6, r) * (1.0 - smoothstep(0.8, 0.9, r));
+        float a = mix(disc, ring, vRing) * vAlpha;
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(vColor, a);
+      }`,
+  });
+  const points = new THREE.Points(geo, pointsMat);
+  points.frustumCulled = false;
+  root.add(points);
+  // cur = what is drawn; from = where each point was when the current layout began
+  const cur = { p: P, c: C, s: S, a: A, r: R };
+  const from = { p: new Float32Array(N * 3), c: new Float32Array(N * 3), s: new Float32Array(N), a: new Float32Array(N), r: new Float32Array(N) };
+  const snapshot = () => { for (const k in cur) from[k].set(cur[k]); };
+
+  // one point's target, filled in by a layout
+  const T = { x: 0, y: 0, z: 0, col: new THREE.Color(), s: 0.1, a: 1, r: 0 };
+  const put = (i, q) => { // cur[i] = mix(from[i], T, q)
+    const j = 3 * i;
+    P[j] = mix(from.p[j], T.x, q); P[j + 1] = mix(from.p[j + 1], T.y, q); P[j + 2] = mix(from.p[j + 2], T.z, q);
+    C[j] = mix(from.c[j], T.col.r, q); C[j + 1] = mix(from.c[j + 1], T.col.g, q); C[j + 2] = mix(from.c[j + 2], T.col.b, q);
+    S[i] = mix(from.s[i], T.s, q); A[i] = mix(from.a[i], T.a, q); R[i] = mix(from.r[i], T.r, q);
+  };
+  const setT = (x, y, z, key, s, a, r = 0) => { T.x = x; T.y = y; T.z = z; T.col.copy(PAL[key]); T.s = s; T.a = a; T.r = r; };
+
+  // ---------------------------------------------------------------- 3D labels: HTML placed at projected points
+  const labelLayer = document.getElementById("labels");
+  const labels = [];
+  const label = (text, x, y, z, beat, at = 0, cls = "", html = false) => {
+    const el = document.createElement("span");
+    el[html ? "innerHTML" : "textContent"] = text;
+    if (cls) el.className = cls;
+    el.style.opacity = "0";
+    labelLayer.append(el);
+    const l = { el, v: new THREE.Vector3(x, y, z), beat, at };
+    labels.push(l);
+    return l;
+  };
+  const v = new THREE.Vector3();
+  const placeLabels = (t, w, h) => {
+    for (const l of labels) {
+      const on = l.beat === beat && t >= l.at;
+      l.el.style.opacity = on ? "1" : "0";
+      if (!on) continue;
+      v.copy(l.v).applyMatrix4(root.matrixWorld).project(camera);
+      l.el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px) translate(-50%, -50%)`;
+    }
+  };
+
+  // ---------------------------------------------------------------- objects that belong to one beat
+  const groups = {};
+  const beatGroup = (beat) => { const g = new THREE.Group(); g.userData.fade = 0; root.add(g); groups[beat] = g; return g; };
+  const basic = (key, opacity = 1) => tint(new THREE.Mesh(undefined, new THREE.MeshBasicMaterial({ transparent: true, opacity, depthWrite: false })), key);
+  const lineMat = (key, opacity = 1) => { const m = new THREE.LineBasicMaterial({ transparent: true, opacity }); tinted.push({ material: m, key }); return m; };
+
+  // evals 101, part 1 · test: one task through a model and a grader, on a loop
+  const gTest = beatGroup("test");
+  const STATIONS = [["task", -5.2], ["model", -2.6], ["answer", 0], ["grader", 2.4], ["score", 4.8]];
+  const at = Object.fromEntries(STATIONS.map(([k, x]) => [k, new THREE.Vector3(x, 0, 0)]));
+  const model = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(0.85, 1)), lineMat("ink", 0.8));
+  model.position.copy(at.model);
+  gTest.add(model);
+  const miniGate = basic("ink", 0.9);
+  miniGate.geometry = new THREE.TorusGeometry(0.75, 0.03, 12, 90);
+  miniGate.position.copy(at.grader);
+  miniGate.rotation.y = 0.95; // turned toward the audience so it reads as a ring
+  gTest.add(miniGate);
+  STATIONS.forEach(([k, x]) => label(k, x, -1.35, 0, "test", 0.3));
+  const answerTag = label(data.route.value, at.answer.x, 0.7, 0, "test", 0, "big");
+  const passTag = label("pass ✓", at.score.x, 0.7, 0, "test", 0, "big");
+  const HERO = PASS[0]; // one passing transcript makes the trip
+  const LOOP = 6; // seconds per trip
+
+  // evals 101, part 2 · score: every transcript passes through the grader ring
+  const GATE = new THREE.Vector3(-3.4, 0, 0);
+  const gEval = beatGroup("score");
+  const gate = basic("ink", 0.9);
+  gate.geometry = new THREE.TorusGeometry(1.15, 0.035, 12, 120);
+  gate.position.copy(GATE);
+  gate.rotation.y = Math.PI / 2 - 0.35;
+  gEval.add(gate);
+  const blockOf = (i) => {
+    const pass = D[i][0] === 1, k = blockSlot[i], cols = Math.ceil((pass ? PASS : FAIL).length / 10);
+    return [-1.7 + (k % cols) * 0.2, (pass ? 2.5 : -0.7) - Math.floor(k / cols) * 0.2, 0, pass, cols];
+  };
+  label("grader", GATE.x, GATE.y - 1.55, 0, "score", 0.6);
+  label(`pass · ${data.tally.pass}`, 1.0, 2.95, 0, "score", 3.9, "big");
+  label(`fail · ${data.tally.fail}`, 0.2, -2.95, 0, "score", 3.9, "big");
+
+  // 2 · judges: a regex beam sweeps across the passes
+  const gJudges = beatGroup("judges");
+  const beam = basic("regex", 0.55);
+  beam.geometry = new THREE.PlaneGeometry(0.07, 3.4);
+  gJudges.add(beam);
+  const beamGlow = basic("regex", 0.12);
+  beamGlow.geometry = new THREE.PlaneGeometry(0.6, 3.4);
+  gJudges.add(beamGlow);
+  const SWEEP = [1.0, 3.6], BX = [-4.2, 4.2];
+  const beamX = (t) => mix(BX[0], BX[1], clamp01((t - SWEEP[0]) / (SWEEP[1] - SWEEP[0])));
+  const judgeSlot = (i) => { const k = blockSlot[i], cols = Math.ceil(PASS.length / 10); return [-3.5 + (k % cols) * 0.27, 1.5 - Math.floor(k / cols) * 0.27]; };
+  const reached = (x, t) => t >= mix(SWEEP[0], SWEEP[1], (x - BX[0]) / (BX[1] - BX[0]));
+  label("regex", 0, 2.1, 0, "judges", 1.0);
+  label(`<b class="c-regex">●</b> caught ${data.tally.caught} &nbsp; ○ missed ${data.tally.missed} &nbsp; `
+    + `<b class="c-regex">○</b> false alarm ${data.tally.false_alarm}`, 0, -1.8, 0, "judges", 3.8, "legend", true);
+
+  // 3 · route: the same problem, two routes to the same final answer
+  const r3 = data.route;
+  const gRoute = beatGroup("route");
+  const S0 = new THREE.Vector3(-5, -0.3, 0), A0 = new THREE.Vector3(4.2, -0.3, 0);
+  const derivePts = [S0];
+  for (let k = 1; k <= r3.derive; k++) {
+    const u = k / (r3.derive + 1);
+    derivePts.push(new THREE.Vector3(mix(S0.x, A0.x, u), -0.3 + 2.3 * Math.sin(Math.PI * u), 0.4 * Math.sin(3 * u)));
+  }
+  derivePts.push(A0);
+  const guessPts = [S0];
+  for (let k = 1; k <= r3.guess; k++) {
+    const u = k / (r3.guess + 1);
+    guessPts.push(new THREE.Vector3(S0.x + 5.6 * u + 0.6 * Math.sin(k * 2.3) * u, -1.3 - 0.9 * Math.abs(Math.sin(k * 1.7)), 0.5 * Math.cos(k * 1.3)));
+  }
+  const tube = (pts, key, radius) => {
+    const m = basic(key, 1);
+    m.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "centripetal"), 240, radius, 8, false);
+    m.geometry.setDrawRange(0, 0);
+    gRoute.add(m);
+    return m;
+  };
+  const deriveTube = tube(derivePts, "ink", 0.04);
+  const guessTube = tube(guessPts, "ink-2", 0.028);
+  const nodeGeo = new THREE.SphereGeometry(0.1, 16, 12);
+  const nodes = [];
+  const node = (p, key, at, scale = 1) => {
+    const m = basic(key, 1); m.geometry = nodeGeo; m.position.copy(p); m.scale.setScalar(0.001);
+    m.userData = { at, scale }; gRoute.add(m); nodes.push(m); return m;
+  };
+  derivePts.slice(1, -1).forEach((p, k) => node(p, "ink", mix(0.5, 2.4, (k + 1) / (derivePts.length - 1))));
+  guessPts.slice(1).forEach((p, k) => node(p, "ink-2", mix(1.3, 3.0, (k + 1) / (guessPts.length - 1))));
+  node(S0, "ink", 0.2, 1.6);
+  const answerNode = node(A0, "ink", 2.4, 2.4);
+  const leap = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ size: 0.14, transparent: true, depthWrite: false }));
+  tinted.push({ material: leap.material, key: "ink" });
+  let leapMid;
+  { // a dotted jump from the last guessing step to the final answer
+    const L = guessPts[guessPts.length - 1], mid = L.clone().lerp(A0, 0.5).add(new THREE.Vector3(0, 1.4, 0.4));
+    const arc = new THREE.QuadraticBezierCurve3(L, mid, A0).getPoints(18);
+    leapMid = arc[9];
+    leap.geometry.setFromPoints(arc);
+    leap.geometry.setDrawRange(0, 0);
+    gRoute.add(leap);
+  }
+  label("problem", S0.x, S0.y + 0.55, 0, "route", 0.2);
+  label(`derives · ${r3.derive} steps`, 0, 2.55, 0, "route", 1.6);
+  label(`guesses · ${r3.guess} steps`, -1.6, -2.95, 0, "route", 2.6);
+  label("the leap", leapMid.x - 0.4, leapMid.y + 0.45, 0, "route", 3.7);
+  label(`${r3.value} · pass`, A0.x, A0.y - 0.75, 0, "route", 2.5, "big");
+
+  // 4 · reads: Jev at the centre, one spoke per question, three dots per spoke (the three wordings)
+  const gReads = beatGroup("reads");
+  const CORE = new THREE.Vector3(0.6, 0, 0);
+  const core = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(1.0, 1)), lineMat("jev", 0.9));
+  core.position.copy(CORE);
+  gReads.add(core);
+  const coreGlow = basic("jev", 0.12);
+  coreGlow.geometry = new THREE.SphereGeometry(0.62, 24, 16);
+  coreGlow.position.copy(CORE);
+  gReads.add(coreGlow);
+  const answers = data.reads;
+  const R0 = 1.25, RL = 3.0;
+  const spokeGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0)]);
+  const spokes = answers.map((q, k) => {
+    const ang = Math.PI / 2 - (k * 2 * Math.PI) / answers.length;
+    const ps = q.p.filter((p) => p !== null), top = ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : 0;
+    const line = new THREE.Line(spokeGeo, lineMat(q.composite ? "jev" : "muted", q.composite ? 0.9 : 0.5));
+    line.position.set(CORE.x + R0 * Math.cos(ang), CORE.y + R0 * Math.sin(ang), 0);
+    line.rotation.z = ang;
+    gReads.add(line);
+    return { ang, top, line, q };
+  });
+  const aGeo = new THREE.BufferGeometry();
+  const aPos = new Float32Array(answers.length * 9);
+  aGeo.setAttribute("position", new THREE.BufferAttribute(aPos, 3));
+  const aDots = new THREE.Points(aGeo, new THREE.PointsMaterial({ size: 0.16, transparent: true, depthWrite: false, vertexColors: true }));
+  const aCol = new Float32Array(answers.length * 9);
+  aGeo.setAttribute("color", new THREE.BufferAttribute(aCol, 3));
+  gReads.add(aDots);
+  for (const p of [0.5, 1]) { // probability rings: a short spoke reads as a low probability, not a missing one
+    const ring = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(
+      new THREE.Path().absarc(0, 0, R0 + RL * p, 0, 2 * Math.PI).getPoints(96)), lineMat("muted", 0.35));
+    ring.position.copy(CORE);
+    gReads.add(ring);
+    label(`p = ${p}`, CORE.x + 0.05, CORE.y + R0 + RL * p + 0.22, 0, "reads", 0.6);
+  }
+  label("Jev", CORE.x, CORE.y, 0, "reads", 0.3, "big");
+  const inflow = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ size: 0.06, transparent: true, depthWrite: false }));
+  tinted.push({ material: inflow.material, key: "jev" });
+  const INFLOW = 40, inPos = new Float32Array(INFLOW * 3);
+  inflow.geometry.setAttribute("position", new THREE.BufferAttribute(inPos, 3));
+  gReads.add(inflow);
+
+  // 5 · triage: Jev's ranking as a ramp; the top share rises to the judge
+  const gTriage = beatGroup("triage");
+  const JUDGE = new THREE.Vector3(4.4, 3.4, 0);
+  const judgeNode = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(0.75, 0)), lineMat("judge", 0.95));
+  judgeNode.position.copy(JUDGE);
+  gTriage.add(judgeNode);
+  const cutLine = basic("jev", 0.9);
+  cutLine.geometry = new THREE.PlaneGeometry(0.035, 6.2);
+  gTriage.add(cutLine);
+  const topShade = basic("jev", 0.07);
+  topShade.geometry = new THREE.PlaneGeometry(1, 6.2);
+  gTriage.add(topShade);
+  const FLOW = 64, flowPos = new Float32Array(FLOW * 3);
+  const flow = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ size: 0.11, transparent: true, depthWrite: false }));
+  flow.geometry.setAttribute("position", new THREE.BufferAttribute(flowPos, 3));
+  tinted.push({ material: flow.material, key: "judge" });
+  gTriage.add(flow);
+  const rankOf = new Int32Array(N).fill(-1);
+  const rampX = (u) => mix(-5.2, 5.2, u), rampY = (u) => -2.6 + 3.4 * u ** 1.7;
+  const cutState = () => {
+    const rk = data.rankings[state.ranking];
+    return { order: rk.order, cut: rk.cut[state.target - data.targets[0]], n: data.rankings.n };
+  };
+  const cutLabel = label("", 0, 3.3, 0, "triage", 0.9);
+  label("judge", JUDGE.x, JUDGE.y + 1.05, 0, "triage", 0.9);
+  label("ranked last", -4.2, -3.2, 0, "triage", 1.2);
+  label("ranked first", 3.9, 1.85, 0, "triage", 1.2);
+  label('<b class="lg-guess">●</b> guess &nbsp; <b class="lg-honest">●</b> honest', 2.6, -3.2, 0, "triage", 1.2, "", true);
+
+  // ---------------------------------------------------------------- layouts: where each point goes, per beat
+  const R_OPEN = 3.7;
+  const sphere = (i, t, radius) => {
+    const y = 1 - (2 * (i + 0.5)) / N, rr = Math.sqrt(1 - y * y), th = i * 2.399963 + t * 0.12;
+    const x = Math.cos(th) * rr, z = Math.sin(th) * rr;
+    const breathe = radius * (1 + 0.025 * Math.sin(t * 0.9 + i));
+    return [x * breathe, (y * Math.cos(0.35) - z * Math.sin(0.35)) * breathe, (y * Math.sin(0.35) + z * Math.cos(0.35)) * breathe];
+  };
+  const far = (i) => [mix(-9, 9, hash(i, 5)), mix(-6, 6, hash(i, 6)), -9 - 3 * hash(i, 7)];
+
+  const layout = {
+    open(t) {
+      for (let i = 0; i < N; i++) {
+        const [x, y, z] = sphere(i, t, R_OPEN);
+        setT(x, y, z, "ink-2", 0.12, 0.85);
+        put(i, ease((t - 0.3 * hash(i, 1)) / 1.4));
+      }
+    },
+    test(t) {
+      const u = FROZEN === null && still() ? 4.4 : t % LOOP; // reduced motion: the trip, finished
+      const trip = [at.task, at.model, at.answer, at.grader, at.score];
+      const leg = Math.min(3, Math.floor(u / 1)), q = ease(u - leg);
+      for (let i = 0; i < N; i++) {
+        if (i === HERO && u < 4) {
+          const a = trip[leg], b = trip[leg + 1];
+          setT(mix(a.x, b.x, q), 0.35 * Math.sin(Math.PI * q), 0, leg >= 3 && q > 0.5 ? "ink" : "ink-2", 0.34, 1);
+          put(i, 1);
+          continue;
+        }
+        if (i === HERO) { // resting at the score, then fading before the next trip
+          setT(at.score.x, 0, 0, "ink", 0.34, Math.min(1, Math.max(0, 1 - (u - 5) * 2)));
+          put(i, 1);
+          continue;
+        }
+        const [x, y, z] = sphere(i, t, 0.95);
+        setT(at.task.x + x, y, z, "ink-2", 0.08, 0.7);
+        put(i, ease((t - 0.3 * hash(i, 1)) / 1.2));
+      }
+      answerTag.el.style.visibility = u >= 2 && u < 5.5 ? "visible" : "hidden";
+      passTag.el.style.visibility = u >= 3.8 && u < 5.5 ? "visible" : "hidden";
+      model.rotation.set(t * 0.2, t * 0.3, 0);
+      const inside = u >= 1 && u < 2 ? Math.sin(Math.PI * (u - 1)) : 0;
+      model.scale.setScalar(1 + 0.12 * inside);
+    },
+    score(t) {
+      for (let i = 0; i < N; i++) {
+        const [bx, by, , pass] = blockOf(i);
+        const qx = -5.3 - 0.5 * hash(i, 8), qy = (streamOrder[i] - 0.5) * 5.6, qz = (hash(i, 9) - 0.5) * 1.4;
+        const go = 0.9 + streamOrder[i] * 2.4; // when this transcript enters the grader
+        if (t < go) { // walk to the queue on the left, then wait
+          setT(qx, qy, qz, "ink-2", 0.11, 0.8);
+          put(i, ease(t / 0.9));
+        } else if (t < go + 0.45) { // through the ring
+          const q = ease((t - go) / 0.45);
+          setT(mix(qx, GATE.x, q), mix(qy, GATE.y, q), mix(qz, 0, q), "ink-2", 0.11, 0.8);
+          put(i, 1);
+        } else { // out to its block, pass or fail
+          const q = easeOut((t - go - 0.45) / 0.8);
+          setT(mix(GATE.x, bx, q), mix(GATE.y, by, q), 0, pass ? "ink" : "muted", pass ? 0.13 : 0.11, pass ? 1 : 0.5);
+          put(i, 1);
+        }
+      }
+    },
+    judges(t) {
+      for (let i = 0; i < N; i++) {
+        const d = D[i];
+        if (d[0] !== 1) {
+          const [x, y, z] = far(i);
+          setT(x, y, z, "muted", 0.1, 0.07);
+        } else {
+          const [x, y] = judgeSlot(i);
+          if (!reached(x, t)) setT(x, y, 0, "ink", 0.13, 0.95);
+          else if (d[2] && d[1] === 1) setT(x, y, 0, "regex", 0.17, 1);
+          else if (d[2]) setT(x, y, 0, "regex", 0.19, 1, 1); // a false alarm: flagged, but honest
+          else if (d[1] === 1 && t >= 4.2) setT(x, y, 0, "ink", 0.2, 1, 1);
+          else setT(x, y, 0, "ink-2", 0.11, 0.4);
+        }
+        put(i, ease((t - 0.2 * hash(i, 2)) / 0.9));
+      }
+      beam.position.set(beamX(t), -0.1, 0.1);
+      beamGlow.position.copy(beam.position);
+      beam.visible = beamGlow.visible = t >= SWEEP[0] - 0.2 && t <= SWEEP[1] + 0.3;
+    },
+    route(t) {
+      for (let i = 0; i < N; i++) {
+        const [x, y, z] = far(i);
+        setT(x, y, z, "muted", 0.1, 0.06);
+        put(i, ease((t - 0.3 * hash(i, 4)) / 1.2));
+      }
+      const full = (m) => m.geometry.index.count;
+      deriveTube.geometry.setDrawRange(0, Math.floor(full(deriveTube) * clamp01((t - 0.4) / 2.0) / 6) * 6);
+      guessTube.geometry.setDrawRange(0, Math.floor(full(guessTube) * clamp01((t - 1.2) / 1.8) / 6) * 6);
+      leap.geometry.setDrawRange(0, Math.floor(19 * clamp01((t - 3.1) / 0.6)));
+      for (const m of nodes) {
+        const q = easeOut((t - m.userData.at) / 0.35);
+        const pulse = m === answerNode ? 1 + 0.25 * Math.max(0, Math.sin((t - 2.4) * 5)) * Math.exp(-(t - 2.4)) : 1;
+        m.scale.setScalar(Math.max(0.001, q * m.userData.scale * pulse));
+      }
+    },
+    reads(t) {
+      layout.route(99); // keep the crowd where the route beat left it
+      spokes.forEach((s, k) => {
+        const q = easeOut((t - 0.4 - 0.06 * k) / 1.0);
+        s.line.scale.set(Math.max(0.001, RL * s.top * q), 1, 1);
+        s.q.p.forEach((p, j) => {
+          const o = 9 * k + 3 * j, rr = R0 + RL * (p ?? 0) * q;
+          aPos[o] = CORE.x + rr * Math.cos(s.ang); aPos[o + 1] = CORE.y + rr * Math.sin(s.ang); aPos[o + 2] = (j - 1) * 0.12;
+          const c = PAL[s.q.composite ? "jev" : "muted"];
+          aCol[o] = c.r; aCol[o + 1] = c.g; aCol[o + 2] = c.b;
+        });
+      });
+      aGeo.attributes.position.needsUpdate = aGeo.attributes.color.needsUpdate = true;
+      core.rotation.set(t * 0.21, t * 0.33, 0);
+      for (let k = 0; k < INFLOW; k++) { // excerpts flowing into Jev from the left
+        const u = (t * 0.45 + hash(k, 11)) % 1;
+        inPos[3 * k] = mix(-6.5, CORE.x, u); inPos[3 * k + 1] = mix((hash(k, 12) - 0.5) * 5, CORE.y, u * u); inPos[3 * k + 2] = 0;
+      }
+      inflow.geometry.attributes.position.needsUpdate = true;
+      inflow.material.userData.base = t < 0.2 ? 0 : 0.6;
+    },
+    triage(t, m) {
+      const { order, cut, n } = cutState();
+      rankOf.fill(-1);
+      order.forEach((i, k) => { rankOf[i] = k; });
+      for (let i = 0; i < N; i++) {
+        const k = rankOf[i];
+        if (k < 0) {
+          const [x, y, z] = far(i);
+          setT(x, y, z, "muted", 0.1, 0.05);
+        } else {
+          const u = 1 - k / (n - 1), guess = D[i][1] === 1, top = k < cut;
+          setT(rampX(u), rampY(u), (hash(i, 13) - 0.5) * 0.9, guess ? "ink" : "muted", guess ? 0.17 : 0.1, top ? 1 : 0.3);
+        }
+        put(i, ease((m - 0.25 * (k < 0 ? 0 : k / n)) / 0.9));
+      }
+      const uc = 1 - (cut - 0.5) / (n - 1), xc = rampX(Math.min(1, uc));
+      cutLine.position.set(xc, 0.2, 0.2);
+      topShade.scale.x = Math.max(0.001, 5.6 - xc);
+      topShade.position.set((xc + 5.6) / 2, 0.2, -0.2);
+      cutLabel.v.set(Math.min(xc, JUDGE.x - 2.4), 3.55, 0); // never across the judge
+      cutLabel.el.textContent = `the judge reads ${Math.round((100 * cut) / n)}%`;
+      judgeNode.rotation.set(t * 0.17, t * 0.29, 0);
+      for (let k = 0; k < FLOW; k++) { // the passed-on share streams up to the judge
+        const src = order[Math.floor(hash(k, 14) * Math.max(1, cut))];
+        const u = (t * 0.35 + hash(k, 15)) % 1, j = 3 * src;
+        const a = new THREE.Vector3(P[j], P[j + 1], P[j + 2]);
+        const mid = a.clone().lerp(JUDGE, 0.5).add(new THREE.Vector3(0, 1.2, 0));
+        const p = new THREE.QuadraticBezierCurve3(a, mid, JUDGE).getPoint(u);
+        flowPos[3 * k] = p.x; flowPos[3 * k + 1] = p.y; flowPos[3 * k + 2] = p.z;
+      }
+      flow.geometry.attributes.position.needsUpdate = true;
+      flow.material.userData.base = t < 1 ? 0 : 0.85;
+    },
+    compare(t) {
+      for (let i = 0; i < N; i++) {
+        const [x, y, z] = far(i);
+        setT(x, y, z, "muted", 0.1, 0.08);
+        put(i, ease(t / 1.2));
+      }
+    },
+    close(t) {
+      for (let i = 0; i < N; i++) {
+        const [x, y, z] = sphere(i, t, 5.6);
+        setT(x, y, z - 6, "ink-2", 0.11, 0.16);
+        put(i, ease((t - 0.4 * hash(i, 1)) / 1.6));
+      }
+    },
+  };
+  label(`each dot is one transcript · ${N}`, 0, -4.6, 0, "open", 1.2);
+  const ORDER = ["open", "test", "score", "route", "judges", "reads", "triage", "compare", "close"];
+  const CENTRED = new Set(["compare", "close"]); // wide text: the scene sits behind it, centred
+
+  // ---------------------------------------------------------------- the clock and beat changes
+  let beat = null, beatStart = 0, moveStart = 0;
+  const since = (at) => (FROZEN !== null ? FROZEN : still() ? END : (performance.now() - at) / 1000);
+  const enter = (next) => {
+    if (beat === next) return;
+    snapshot();
+    beat = next;
+    beatStart = moveStart = performance.now();
+  };
+  // start from where the previous beat would have left the points, so any hash opens mid-talk correctly
+  readPalette();
+  const first = layout[state.beat] ? state.beat : "open";
+  for (const b of ORDER.slice(0, Math.max(0, ORDER.indexOf(first)))) {
+    if (!layout[b]) continue;
+    beat = b; snapshot(); layout[b](END, END);
+  }
+  beat = null;
+  enter(first);
+
+  let triageKey = `${state.ranking}/${state.target}`;
+  document.addEventListener("stage", (e) => {
+    const s = e.detail;
+    if (layout[s.beat]) enter(s.beat);
+    const key = `${s.ranking}/${s.target}`;
+    if (beat === "triage" && key !== triageKey) { snapshot(); moveStart = performance.now(); } // re-sort from here
+    triageKey = key;
+  });
+  document.addEventListener("stage-theme", () => requestAnimationFrame(readPalette));
+
+  // ---------------------------------------------------------------- size and composition
+  let W = 0, H = 0, offset = 0, scale = 1;
+  const resize = () => {
+    W = innerWidth; H = innerHeight;
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    camera.updateProjectionMatrix();
+    const halfH = camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), halfW = halfH * camera.aspect;
+    const wide = W > 900 && camera.aspect > 1.1;
+    offset = wide ? halfW * 0.5 : 0;
+    scale = wide ? Math.min(1.15, (halfW * 0.95) / 11.5, (2 * halfH * 0.86) / 8.6) : Math.min(1, (2 * halfW * 0.95) / 11.5);
+    pointsMat.uniforms.uPx.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+  };
+  addEventListener("resize", resize);
+  resize();
+
+  // ---------------------------------------------------------------- the frame
+  const t0 = performance.now();
+  const frame = () => {
+    const t = since(beatStart), g = (performance.now() - t0) / 1000;
+    layout[beat](t, since(moveStart));
+    geo.attributes.position.needsUpdate = geo.attributes.aColor.needsUpdate = true;
+    geo.attributes.aSize.needsUpdate = geo.attributes.aAlpha.needsUpdate = geo.attributes.aRing.needsUpdate = true;
+    for (const [b, grp] of Object.entries(groups)) { // fade each beat's own objects in and out
+      grp.userData.fade = still() ? +(b === beat) : mix(grp.userData.fade, +(b === beat), 0.08);
+      grp.visible = grp.userData.fade > 0.01;
+      grp.traverse((o) => { if (o.material) o.material.opacity = (o.material.userData.base ??= o.material.opacity) * grp.userData.fade; });
+    }
+    const x = CENTRED.has(beat) ? 0 : offset;
+    root.position.x = still() ? x : mix(root.position.x, x, 0.06);
+    root.scale.setScalar(scale);
+    root.rotation.y = still() ? 0 : 0.1 * Math.sin(g * 0.13);
+    root.rotation.x = still() ? 0 : 0.045 * Math.sin(g * 0.09);
+    root.updateMatrixWorld();
+    renderer.render(scene, camera);
+    placeLabels(t, W, H);
+  };
+  // Browsers pause requestAnimationFrame in background tabs, so the loop needs no visibility check (embedded
+  // frames can report "hidden" while on screen, which froze the scene). One bad frame must not stop the rest.
+  let warned = false;
+  const loop = () => {
+    try {
+      frame();
+    } catch (err) {
+      if (!warned) console.error("stage scene:", err);
+      warned = true;
+    }
+    window.__stageFrame = true;
+    requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+start();
+</script>
+</body>
+</html>
